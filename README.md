@@ -45,21 +45,25 @@ Chromium needs permission to launch normal macOS processes. In the VS Code termi
 
 ## Static hosting
 
-No deployment, remote Git repository or commit has been created. Choose one host and configure its final URL before presentation.
+GitHub Pages deployment is configured in `.github/workflows/nextjs.yml` for the standalone MUSON repository.
 
-### Cloudflare Pages (recommended)
+### Cloudflare Pages (alternative)
 
 Connect the standalone MUSON repository using the **Next.js Static HTML Export** preset. Build command: `npm run build`. Output directory: `out`. Set Node to 22. Leave `NEXT_PUBLIC_BASE_PATH` empty and set `NEXT_PUBLIC_SITE_ORIGIN` to the final HTTPS origin, for example `https://your-project.pages.dev`. No Workers, backend or OpenNext adapter is required.
 
 ### GitHub Pages
 
-For a project repository named `muson`:
+In the repository's **Settings > Pages**, select **GitHub Actions** as the build and deployment source. Pushes to `main` deploy automatically; the workflow can also be run manually from the **Actions** tab.
+
+The workflow uses Node 22 and `npm ci`, builds the static export, and publishes `out`. It obtains `NEXT_PUBLIC_BASE_PATH` and `NEXT_PUBLIC_SITE_ORIGIN` from the Pages configuration so links, assets and certificate QR URLs share the deployed address, including custom domains. Only the deployment job has Pages write and OIDC permissions.
+
+To reproduce a project-site build locally:
 
 ```sh
-NEXT_PUBLIC_BASE_PATH=/muson NEXT_PUBLIC_SITE_ORIGIN=https://YOUR-OWNER.github.io npm run build
+NEXT_PUBLIC_BASE_PATH=/muson NEXT_PUBLIC_SITE_ORIGIN=https://nardia-music.github.io npm run build
 ```
 
-Publish the **contents of `out`** as the Pages artifact via GitHub Actions. The base path is compiled into links, assets and QR URLs; don't add another `muson` directory inside the artifact. A custom-domain/root site uses an empty base path. The export includes `.nojekyll`. No deployment workflow is enabled until the host/repository is selected.
+The artifact contains the **contents of `out`**; don't add another `muson` directory inside it. A custom-domain/root site uses an empty base path. Actions publishes the artifact directly without a Jekyll build.
 
 Both settings are public build-time values, never secrets. Changing them requires rebuilding. To return to local root hosting: `NEXT_PUBLIC_BASE_PATH= NEXT_PUBLIC_SITE_ORIGIN= npm run build`.
 
