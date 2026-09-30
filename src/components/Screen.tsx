@@ -34,6 +34,7 @@ import {
   About,
   Contact,
   Login,
+  SignUp,
   Roadmap,
 } from "@/features/Public";
 
@@ -46,6 +47,7 @@ const screens = {
   about: About,
   contact: Contact,
   login: Login,
+  signup: SignUp,
   roadmap: Roadmap,
   candidate: Overview,
   "candidate/profile": Profile,

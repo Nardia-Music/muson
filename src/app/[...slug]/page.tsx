@@ -11,6 +11,7 @@ export function generateStaticParams() {
     "about",
     "contact",
     "login",
+    "signup",
     "roadmap",
     "candidate",
     "candidate/profile",

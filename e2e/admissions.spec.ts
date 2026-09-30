@@ -1,5 +1,12 @@
 import { test, expect } from "@playwright/test";
 
+test.beforeEach(async ({ page }) => {
+  await page.goto("/login/");
+  await page.getByText("Presentation workspaces", { exact: true }).click();
+  await page.getByRole("button", { name: "Enter candidate demo" }).click();
+  await expect(page).toHaveURL(/\/candidate\/?$/);
+});
+
 test("selected profile and document files survive a reload", async ({ page }) => {
   await page.goto("/candidate/profile/");
   await page.getByLabel("Profile photo (fictional image only)").setInputFiles("public/brand/muson.png");

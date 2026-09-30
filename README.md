@@ -22,6 +22,7 @@ Use **Demo controls** to switch between Ada, the administrator, Dr Adebayo and M
 ## Included
 
 - Public programme pages, contact acknowledgement, role chooser and certificate lookup.
+- Candidate sign-up, login, logout, saved browser-local sessions, return-to-application navigation and local account reset.
 - Diploma draft, local document uploads, mock fee, replacement requests, verification, shortlisting and capacity-aware entrance scheduling.
 - Graded registration, mock payment, shuffled timed theory with notation/audio, browser warnings and provisional scoring.
 - A single practical video submission, spoken code, declaration and submission deadline.
@@ -39,7 +40,7 @@ npx playwright install chromium
 npm run test:e2e -- --workers=2
 ```
 
-Validated on macOS / Node 22: 15 domain/PDF tests and 10 Chromium browser checks (1440px desktop and 390px mobile). Browser checks cover the connected exam cycle, PDF download, appeals/revocation, timer reload/expiry, actual IndexedDB uploads, Diploma replacement/scheduling, deep links, images and horizontal overflow. Screenshots and failure traces are generated under ignored `test-results/`.
+Validated on macOS / Node 22: 20 domain/PDF/account tests and 12 Chromium browser checks (1440px desktop and 390px mobile). Browser checks cover sign-up validation, login/logout, session persistence, account reset, return destinations, the connected exam cycle, PDF download, appeals/revocation, timer reload/expiry, actual IndexedDB uploads, Diploma replacement/scheduling, deep links, images and horizontal overflow. Screenshots and failure traces are generated under ignored `test-results/`.
 
 Chromium needs permission to launch normal macOS processes. In the VS Code terminal sandbox, use an approved unsandboxed browser-test run; dependency downloads can use `PLAYWRIGHT_BROWSERS_PATH` in a writable temporary directory.
 
@@ -70,6 +71,16 @@ Both settings are public build-time values, never secrets. Changing them require
 After hosting, directly open `/candidate/theory/` and `/verify/?number=MUSON-DEMO-2026` (with the project prefix if used), reload them, play the sample media, download a PDF and scan the sample QR from a phone.
 
 ## Data and limitations
+
+### Demo accounts
+
+Open `/signup/` to create one fictional candidate account in this browser. Choose a throwaway password of at least eight characters. Signing up starts a fresh candidate journey and fills the profile name/email; complete the remaining profile fields in **My profile**. This is a single-candidate demo, not a multi-user account system.
+
+Candidate deep links redirect to `/login/` when signed out and resume their original destination after login or sign-up. Sessions survive refresh; **Log out** ends the session without deleting saved progress. Login uses the email supplied at sign-up, even if the contact email is later edited in the profile.
+
+**Forgot password? > Reset demo account** asks for confirmation, clears the account, progress and uploaded files, and opens sign-up again. It does not send an email. Loading a checkpoint also removes the local account and resumes a seeded demonstration session. The full demo reset clears the account and signs out.
+
+The **Presentation workspaces** chooser on the account screens and **Demo controls** deliberately bypass login. Candidate, administrator and examiner views still share the same local dataset. Only a salted PBKDF2 password verifier is persisted, never the entered password, but browser storage and route guards provide no production security. Do not use real passwords or personal details. There is no server authentication, email verification or cross-device account recovery.
 
 Zustand metadata uses localStorage key `muson-demo-v1`; selected files use the dedicated `muson-demo-files` IndexedDB database. Reset clears this demo's uploads. Use only synthetic files; this is not a secure storage, identity or retention system. Keep one presenting browser tab. Private browsing/storage restrictions may prevent persistence; bundled media remains available.
 

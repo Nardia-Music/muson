@@ -10,7 +10,13 @@ async function checkpoint(page: Page, name: string) {
   await page.getByLabel("Load checkpoint").selectOption(name);
 }
 
-test.beforeEach(async ({ page }) => { page.on("dialog", dialog => dialog.accept()); });
+test.beforeEach(async ({ page }) => {
+  page.on("dialog", dialog => dialog.accept());
+  await page.goto("/login/");
+  await page.getByText("Presentation workspaces", { exact: true }).click();
+  await page.getByRole("button", { name: "Enter candidate demo" }).click();
+  await expect(page).toHaveURL(/\/candidate\/?$/);
+});
 
 test("connected exam, publication, PDF, appeal and revocation", async ({ page }, info) => {
   await page.goto("/candidate/register/");

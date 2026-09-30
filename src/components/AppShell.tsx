@@ -15,6 +15,7 @@ import {
   FileCheck2,
   GraduationCap,
   LayoutDashboard,
+  LogOut,
   Menu,
   RotateCcw,
   Settings2,
@@ -59,7 +60,7 @@ const roles: [Role, string][] = [
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {
-  const { data, hydrated, ready, run, reset, error, clearError } = useDemo();
+  const { data, hydrated, ready, run, reset, error, clearError, signedIn, signOut, enterDemo } = useDemo();
   const pathname = usePathname();
   const router = useRouter();
   const [menu, setMenu] = useState(false);
@@ -67,11 +68,16 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [notifications, setNotifications] = useState(false);
   const section = pathname.split("/")[1];
   const portal = ["candidate", "admin", "examiner"].includes(section);
+  const needsLogin = section === "candidate" && !signedIn;
   useEffect(() => {
     Promise.resolve(useDemo.persist.rehydrate()).finally(ready);
   }, [ready]);
   useEffect(() => {
     if (!hydrated) return;
+    if (needsLogin) {
+      router.replace(`/login?next=${encodeURIComponent(pathname + window.location.search)}`);
+      return;
+    }
     const role = useDemo.getState().data.role;
     if (section === "candidate" && role !== "candidate")
       run({ type: "role", role: "candidate" });
@@ -79,9 +85,9 @@ export function AppShell({ children }: { children: ReactNode }) {
       run({ type: "role", role: "admin" });
     if (section === "examiner" && !role.startsWith("examiner"))
       run({ type: "role", role: "examiner" });
-  }, [section, hydrated, run]);
+  }, [section, hydrated, run, needsLogin, pathname, router]);
   const changeRole = (role: Role) => {
-    run({ type: "role", role });
+    enterDemo(role);
     router.push(
       role === "visitor"
         ? "/"
@@ -132,7 +138,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             >
               {roles.map(([value, label]) => (
                 <option key={value} value={value}>
-                  {label}
+                  {value === "candidate" ? `Candidate · ${data.profile.name.split(" ")[0]}` : label}
                 </option>
               ))}
             </select>
@@ -157,7 +163,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                   "start" | "registered" | "marking" | "results";
                 if (
                   value &&
-                  confirm("Replace current demo progress with this checkpoint?")
+                  confirm("Replace current demo progress and remove any local account with this checkpoint?")
                 ) {
                   reset(value);
                   router.push(value === "marking" ? "/examiner" : "/candidate");
@@ -176,8 +182,9 @@ export function AppShell({ children }: { children: ReactNode }) {
             title="Reset all demo data"
             aria-label="Reset all demo data"
             onClick={() => {
-              if (confirm("Reset all demo progress and local uploads?")) {
+              if (confirm("Reset all demo progress, local account and uploads?")) {
                 reset("start");
+                signOut();
                 void clearFiles();
                 router.push("/");
               }
@@ -203,10 +210,11 @@ export function AppShell({ children }: { children: ReactNode }) {
             <Link href="/graded-exams">Graded Exams</Link>
             <Link href="/about">About MUSON</Link>
             <Link href="/verify">Check a certificate</Link>
-            <Link className="button small" href="/candidate">
-              My portal
+            <Link className="button small" href={signedIn ? "/candidate" : "/login"}>
+              {signedIn ? "My portal" : "Log in"}
               <ArrowUpRightIcon />
             </Link>
+            {!signedIn && <Link href="/signup">Sign up</Link>}
           </nav>
         </header>
       ) : (
@@ -220,6 +228,13 @@ export function AppShell({ children }: { children: ReactNode }) {
                 : "Examiner portal"}
           </span>
           <div className="top-actions">
+            {signedIn && <button className="icon-button" title="Log out" aria-label="Log out" onClick={() => {
+              signOut();
+              setNotifications(false);
+              setMenu(false);
+              setControls(false);
+              router.replace("/login");
+            }}><LogOut size={20} /></button>}
             <button
               className="icon-button mobile-menu"
               aria-label="Toggle navigation"
@@ -238,7 +253,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             </button>
             <span className="avatar">
               {section === "candidate"
-                ? "AO"
+                ? data.profile.name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase()
                 : section === "admin"
                   ? "MA"
                   : data.role === "examiner-2"
@@ -299,7 +314,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </aside>
         )}
         <main className={portal ? "workspace" : ""}>
-          {hydrated ? (
+          {hydrated && !needsLogin ? (
             children
           ) : (
             <div className="loading" role="status">

@@ -1157,6 +1157,101 @@ audio {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 24px;
 }
+.account-section {
+  padding: 36px 24px 56px;
+  background: linear-gradient(180deg, #eaf2ed80, transparent 420px);
+}
+.account-form {
+  width: 100%;
+  max-width: 440px;
+  margin: 0 auto;
+}
+.account-image {
+  position: relative;
+  height: 112px;
+  margin-bottom: 24px;
+  overflow: hidden;
+}
+.account-image img {
+  object-fit: cover;
+  object-position: center 48%;
+}
+.account-heading h1 {
+  font-family: var(--serif);
+  font-size: 36px;
+  margin: 10px 0;
+}
+.account-fields {
+  padding: 0;
+  margin: 0;
+  border: 0;
+  min-width: 0;
+}
+.account-fields .field > label {
+  font-size: 12px;
+  font-weight: 600;
+}
+.password-input {
+  position: relative;
+}
+.password-input input {
+  padding-right: 48px;
+}
+.password-input button {
+  position: absolute;
+  right: 4px;
+  top: 4px;
+  width: 36px;
+  height: 36px;
+}
+.account-submit {
+  width: 100%;
+  min-height: 46px;
+  justify-content: center;
+}
+.account-error {
+  padding: 12px 14px;
+  margin-bottom: 18px;
+  color: #95383f;
+  background: #f9e8e8;
+  border-left: 3px solid #95383f;
+  font-size: 13px;
+}
+.account-switch {
+  margin: 20px 0;
+  text-align: center;
+  font-size: 13px;
+}
+.account-recovery {
+  display: block;
+  margin: 0 auto;
+  padding: 4px;
+  background: none;
+  border: 0;
+}
+.account-reset {
+  border-top: 1px solid var(--line);
+  margin-top: 22px;
+  padding-top: 22px;
+}
+.account-demo {
+  max-width: 960px;
+  margin: 32px auto 0;
+  border-top: 1px solid var(--line);
+  padding-top: 20px;
+}
+.account-demo summary {
+  cursor: pointer;
+  text-align: center;
+  color: var(--green);
+  font-size: 13px;
+}
+.account-demo .role-grid {
+  margin-top: 24px;
+}
+.account-demo .exam-card p {
+  margin: 12px 0 20px;
+}
 .programme-image {
   width: 100%;
   height: auto;

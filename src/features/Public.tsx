@@ -11,6 +11,8 @@ import {
   Award,
   CalendarDays,
   CheckCircle2,
+  Eye,
+  EyeOff,
   GraduationCap,
   MapPin,
   Search,
@@ -18,6 +20,8 @@ import {
 } from "lucide-react";
 import { asset, verificationUrl } from "@/lib/urls";
 import { useDemo } from "@/lib/store";
+import { candidateDestination } from "@/lib/auth";
+import { clearFiles } from "@/lib/files";
 import { config, date, money, type Role } from "@/lib/workflows";
 import { publicCertificate } from "@/lib/certificates";
 import { Badge, Field, Go, Notice } from "@/components/ui";
@@ -551,14 +555,128 @@ export function Contact() {
 }
 
 export function Login() {
-  const { run } = useDemo();
+  return <AccountAccess signup={false} />;
+}
+
+export function SignUp() {
+  return <AccountAccess signup />;
+}
+
+function PasswordField({ label, name, signup }: { label: string; name: string; signup: boolean }) {
+  const [visible, setVisible] = useState(false);
+  return (
+    <div className="field">
+      <label htmlFor={name}>{label}</label>
+      <div className="password-input">
+        <input id={name} name={name} type={visible ? "text" : "password"} autoComplete={signup ? "new-password" : "current-password"} minLength={signup ? 8 : undefined} required />
+        <button className="icon-button" type="button" aria-label={`${visible ? "Hide" : "Show"} ${label.toLowerCase()}`} title={`${visible ? "Hide" : "Show"} ${label.toLowerCase()}`} aria-pressed={visible} onClick={() => setVisible(!visible)}>
+          {visible ? <EyeOff size={18} /> : <Eye size={18} />}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function AccountAccess({ signup }: { signup: boolean }) {
+  const { account, signedIn, signUp, signIn, signOut, reset } = useDemo();
+  const params = useSearchParams();
+  const router = useRouter();
+  const destination = candidateDestination(params.get("next"));
+  const next = `?next=${encodeURIComponent(destination)}`;
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [recovery, setRecovery] = useState(false);
+  return (
+    <section className="account-section">
+      <div className="account-form">
+        <div className="account-image">
+          <Image src={asset("demo/muson-gala.jpg")} alt="MUSON orchestra and choir on stage" fill sizes="(max-width: 520px) 100vw, 440px" priority />
+        </div>
+        <header className="account-heading">
+          <span className="eyebrow">MUSON STUDENT PORTAL</span>
+          <h1>{signup ? "Create your account" : "Welcome back"}</h1>
+          <p>{signup ? "Your next musical chapter starts here." : "Log in to your student account."}</p>
+        </header>
+        <Notice tone="warning">Demo only. Use fictional details and a password you do not use elsewhere. This account stays in this browser.</Notice>
+        {signedIn && <p className="account-switch"><Link className="text-link" href={destination}>Continue to my portal <ArrowRight size={16} /></Link></p>}
+        {signup && account ? (
+          <Notice>An account already exists in this browser. <Link className="text-link" href={`/login${next}`}>Log in to continue</Link></Notice>
+        ) : (
+          <form aria-label={signup ? "Create account" : "Log in"} aria-busy={busy} onChange={() => setError("")} onSubmit={async (event) => {
+            event.preventDefault();
+            if (busy) return;
+            const values = new FormData(event.currentTarget);
+            const email = String(values.get("email") || "");
+            const password = String(values.get("password") || "");
+            if (signup && password !== values.get("confirm-password")) {
+              setError("Passwords do not match.");
+              return;
+            }
+            setBusy(true);
+            setError("");
+            try {
+              if (signup) await signUp(String(values.get("name") || ""), email, password);
+              else await signIn(email, password);
+              router.replace(destination);
+            } catch (failure) {
+              setError(failure instanceof Error ? failure.message : "Unable to open your account. Please try again.");
+            } finally {
+              setBusy(false);
+            }
+          }}>
+            <fieldset disabled={busy} className="account-fields">
+              {signup && <Field label="Full name"><input name="name" autoComplete="name" placeholder="Tola Bello" minLength={2} required /></Field>}
+              <Field label="Email address"><input name="email" type="email" autoComplete="username" placeholder="tola@example.test" required /></Field>
+              <PasswordField label="Password" name="password" signup={signup} />
+              {signup && <>
+                <PasswordField label="Confirm password" name="confirm-password" signup />
+                <label className="check"><input type="checkbox" required />I understand this is a demo account, not an official MUSON registration.</label>
+              </>}
+              {error && <div className="account-error" role="alert">{error}</div>}
+              <button className="button account-submit" type="submit">{busy ? "Please wait..." : signup ? "Create account" : "Log in"}<ArrowRight size={17} /></button>
+            </fieldset>
+          </form>
+        )}
+        <p className="account-switch">{signup ? "Already have an account? " : "New to MUSON? "}<Link className="text-link" href={`${signup ? "/login" : "/signup"}${next}`}>{signup ? "Log in" : "Create an account"}</Link></p>
+        {!signup && <>
+          <button type="button" className="text-link account-recovery" aria-expanded={recovery} onClick={() => setRecovery(!recovery)}>Forgot password?</button>
+          {recovery && <div className="account-reset">
+            <h2>Reset demo account</h2>
+            <Notice tone="warning">No recovery email is sent. Resetting deletes this browser&apos;s account, saved progress and uploads. You can then create a new demo account.</Notice>
+            <button className="button secondary" disabled={busy} onClick={async () => {
+              if (!confirm("Delete this browser's demo account, all progress and uploads?")) return;
+              setBusy(true);
+              try {
+                await clearFiles();
+                reset("start");
+                signOut();
+                router.replace(`/signup${next}`);
+              } catch {
+                setError("Unable to clear local uploads. Please try again.");
+              } finally {
+                setBusy(false);
+              }
+            }}>Reset demo account</button>
+          </div>}
+        </>}
+      </div>
+      <details className="account-demo">
+        <summary>Presentation workspaces</summary>
+        <DemoWorkspaces destination={destination} />
+      </details>
+    </section>
+  );
+}
+
+function DemoWorkspaces({ destination }: { destination: string }) {
+  const { data, enterDemo } = useDemo();
   const router = useRouter();
   const roles: { name: string; role: Role; href: string; text: string }[] = [
     {
       name: "Candidate",
       role: "candidate",
-      href: "/candidate",
-      text: "Ada Okafor · Applications & examinations",
+      href: destination,
+      text: `${data.profile.name} · Applications & examinations`,
     },
     {
       name: "Administrator",
@@ -574,11 +692,7 @@ export function Login() {
     },
   ];
   return (
-    <PublicPage
-      eyebrow="PRESENTATION ACCESS"
-      title="Choose your workspace"
-      intro="Preloaded personas share one browser-local demonstration. No account or password is needed."
-    >
+    <>
       <div className="role-grid">
         {roles.map((item) => (
           <article className="exam-card" key={item.role}>
@@ -587,21 +701,20 @@ export function Login() {
             <button
               className="button"
               onClick={() => {
-                run({ type: "role", role: item.role });
+                enterDemo(item.role);
                 router.push(item.href);
               }}
             >
-              Enter workspace
+              Enter {item.name.toLowerCase()} demo
               <ArrowRight size={16} />
             </button>
           </article>
         ))}
       </div>
       <Notice>
-        This role chooser is not authentication. Do not enter real personal
-        information in the prototype.
+        Presentation workspaces bypass login and share this browser&apos;s data. This is not secure authentication.
       </Notice>
-    </PublicPage>
+    </>
   );
 }
 
