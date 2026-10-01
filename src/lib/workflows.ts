@@ -2,6 +2,7 @@ import { z } from "zod";
 import { questions, shuffle } from "./questions";
 
 export const DAY = 86_400_000;
+export const dateTime = (value: number | string) => `${new Intl.DateTimeFormat("en-GB", { timeZone: "Africa/Lagos", dateStyle: "medium", timeStyle: "short" }).format(new Date(value))} WAT`;
 export const config = {
   id: "muson",
   name: "Musical Society of Nigeria",
@@ -131,6 +132,7 @@ export type Application = Owned & {
   sittings: number;
   credits: number;
   english: boolean;
+  subjectGrades?: { subject: string; grade: string; sitting: number }[];
   theoryLevel: number;
   practicalLevel: number;
   body: string;
@@ -264,7 +266,7 @@ function registration(
     grade,
     paid: false,
     assignedTo: "examiner",
-    code: `MUSON-${Math.random().toString(36).slice(2, 6).toUpperCase()}`,
+    code: candidateId === "ada" ? "MUSON-ADA-2026" : `MUSON-${candidateId.toUpperCase()}-2026`,
     status: "registered",
     scores: [],
     integrity: "pending",
@@ -280,8 +282,9 @@ export function createSeed(): State {
     status: "graded",
     integrity: "flagged",
     events: [
-      "Window lost focus twice during question 8",
-      "Mock webcam check completed",
+      "3 Dec 2026, 11:03 WAT - Window lost focus during question 8 (seeded scenario)",
+      "3 Dec 2026, 11:04 WAT - Window lost focus again (seeded scenario)",
+      "3 Dec 2026, 11:00 WAT - Simulated readiness check completed",
     ],
     scores: [
       {
@@ -309,7 +312,7 @@ export function createSeed(): State {
     declared: true,
     submittedAt: now,
   });
-  return {
+  const state: State = {
     role: "visitor",
     now,
     profile: {
@@ -335,6 +338,7 @@ export function createSeed(): State {
         sittings: 1,
         credits: 5,
         english: true,
+        subjectGrades: ["English Language", "Mathematics", "Literature in English", "Music", "Government"].map(subject => ({ subject, grade: "B3", sitting: 1 })),
         theoryLevel: 5,
         practicalLevel: 5,
         body: "MUSON",
@@ -361,6 +365,18 @@ export function createSeed(): State {
       },
     ],
   };
+  const applicants: [string, string, Application["status"]][] = [
+    ["Chinwe Eze", "Voice", "submitted"], ["Daniel Akinola", "Violin", "under review"],
+    ["Fatima Yusuf", "Piano", "needs info"], ["Emeka Nwosu", "Trumpet", "shortlisted"],
+    ["Zainab Ibrahim", "Flute", "shortlisted"], ["Samuel Peters", "Guitar", "rejected"],
+  ];
+  applicants.forEach(([name, instrument, status], index) => {
+    const application = structuredClone(state.applications[0]);
+    Object.assign(application, { id: `applicant-${index + 2}`, candidateId: `applicant-${index + 2}`, name, instrument, status, paid: true, note: status === "needs info" ? "Please replace the unreadable SSCE scan." : status === "rejected" ? "Entry requirements not met for this intake." : "" });
+    application.documents = application.documents.map((document, position) => ({ ...document, id: `${application.id}-doc-${position}`, file: "sample", name: `Sample ${document.label}.pdf`, status: status === "shortlisted" ? "verified" : status === "needs info" && position === 0 ? "rejected" : "pending", note: status === "needs info" && position === 0 ? "Please replace the unreadable scan." : "" }));
+    state.applications.push(application);
+  });
+  return state;
 }
 
 function requireCondition(
@@ -624,7 +640,7 @@ export function transition(previous: State, action: Action): State {
     case "flag": {
       if (entry?.attempt && !entry.attempt.submitted) {
         entry.integrity = "flagged";
-        entry.events.push(action.reason);
+        entry.events.push(`${dateTime(Date.now())} - ${action.reason}`);
       }
       break;
     }
@@ -643,8 +659,13 @@ export function transition(previous: State, action: Action): State {
         action.declaration && action.file,
         "A video and signed declaration are required.",
       );
-      const adult =
-        state.now - Date.parse(state.profile.birthDate) >= 18 * 365.25 * DAY;
+      requireCondition(
+        z.iso.date().safeParse(state.profile.birthDate).success && Date.parse(state.profile.birthDate) <= state.now,
+        "Complete a valid date of birth in My profile before submitting your performance.",
+      );
+      const birthday = new Date(state.profile.birthDate);
+      const eighteenthBirthday = Date.UTC(birthday.getUTCFullYear() + 18, birthday.getUTCMonth(), birthday.getUTCDate());
+      const adult = state.now >= eighteenthBirthday;
       requireCondition(
         adult || state.profile.guardian.trim().length > 2,
         "A parent or guardian must sign for an under-18 candidate.",
@@ -886,8 +907,12 @@ export function transition(previous: State, action: Action): State {
         "This application cannot be edited now.",
       );
       const current = state.applications[index];
+      const subjectGrades = action.application.subjectGrades;
+      if (subjectGrades) z.array(z.object({ subject: z.string().trim().min(2), grade: z.enum(["A1", "B2", "B3", "C4", "C5", "C6", "D7", "E8", "F9"]), sitting: z.number().int().min(1).max(2) })).min(1).max(9).refine(rows => new Set(rows.map(row => row.subject.trim().toLowerCase())).size === rows.length, "List each subject only once.").parse(subjectGrades);
+      const credits = subjectGrades?.filter(row => ["A1", "B2", "B3", "C4", "C5", "C6"].includes(row.grade));
       state.applications[index] = {
         ...action.application,
+        ...(credits ? { credits: credits.length, english: credits.some(row => row.subject.trim().toLowerCase() === "english language"), sittings: new Set(subjectGrades!.map(row => row.sitting)).size } : {}),
         ...owned(current.id),
         candidateId: current.candidateId,
         status: current.status,
@@ -973,14 +998,12 @@ export function transition(previous: State, action: Action): State {
       );
       document.status = action.status;
       document.note = action.note;
-      application.status = "under review";
-      if (
-        application.documents
-          .slice(1, 3)
-          .every((item) => item.status === "verified")
-      )
-        state.profile.prerequisite = true;
-      else state.profile.prerequisite = false;
+      application.status = application.documents.some(item => item.status === "rejected") ? "needs info" : "under review";
+      if (action.status === "rejected") {
+        application.note = `Replace ${document.label}: ${action.note}`;
+        notify(state, `${application.name}: replacement requested for ${document.label}.`);
+      }
+      if (application.candidateId === "ada") state.profile.prerequisite = application.documents.slice(1, 3).every(item => item.status === "verified");
       break;
     }
     case "review-application": {
@@ -1058,11 +1081,19 @@ export function transition(previous: State, action: Action): State {
 }
 
 export function checkpoint(
-  name: "start" | "registered" | "marking" | "results",
+  name: "start" | "registered" | "marking" | "results" | "diploma" | "appeal",
 ): State {
   let state = createSeed();
   state.role = "candidate";
   if (name === "start") return state;
+  if (name === "diploma") {
+    const application = structuredClone(state.applications[0]);
+    application.documents.forEach(document => { document.file = "sample"; document.name = `Sample ${document.label}.pdf`; });
+    state = transition(state, { type: "save-application", application });
+    state = transition(state, { type: "submit-application", id: application.id });
+    state.role = "admin";
+    return state;
+  }
   state = transition(state, {
     type: "register",
     grade: 5,
@@ -1121,5 +1152,9 @@ export function checkpoint(
   state = transition(state, { type: "issue", id: "ada-theory" });
   state = transition(state, { type: "issue", id: "ada-practical" });
   state.role = "candidate";
+  if (name === "appeal") {
+    state = transition(state, { type: "appeal", id: "ada-practical", reason: "Please review the interpretation mark for my second piece." });
+    state.role = "examiner-2";
+  }
   return state;
 }

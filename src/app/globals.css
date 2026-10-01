@@ -1161,6 +1161,11 @@ audio {
   padding: 36px 24px 56px;
   background: linear-gradient(180deg, #eaf2ed80, transparent 420px);
 }
+.brand img {
+  background: var(--green);
+  padding: 3px;
+  border-radius: 4px;
+}
 .account-form {
   width: 100%;
   max-width: 440px;
@@ -1258,6 +1263,22 @@ audio {
   aspect-ratio: 3/2;
   object-fit: cover;
 }
+.camera-check { margin-bottom: 24px; }
+.confirm-dialog { width: min(480px, calc(100% - 32px)); padding: 28px; border: 1px solid var(--line); border-radius: 6px; color: var(--ink); }
+.key-dates { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; font-size: 14px; margin: 18px 0 24px; }
+.key-dates dd { margin: 0; }
+.confirm-dialog::backdrop { background: #172c1880; }
+.evidence-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 16px; }
+.evidence-grid figure { margin: 0; min-width: 0; }
+.evidence-grid figcaption { font-size: 11px; margin-top: 6px; }
+.mock-frame { aspect-ratio: 4 / 3; background: #e2e7e4; color: #56685d; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 6px; }
+.mock-frame span { font-size: 8px; text-align: center; }
+.camera-preview, .camera-placeholder { width: 100%; aspect-ratio: 4 / 3; max-height: 240px; object-fit: cover; background: #222c27; color: white; margin: 14px 0; }
+.camera-placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; }
+.camera-check p { font-size: 12px; margin-bottom: 12px; }
+.engraved-notation { max-width: 100%; width: 320px; min-height: 140px; }
+.engraved-notation svg { max-width: 100%; height: auto; }
+.countdown { font-variant-numeric: tabular-nums; font-size: 25px; overflow-wrap: anywhere; }
 h1,
 h2,
 h3,
@@ -1272,6 +1293,9 @@ td,
   }
 }
 @media (max-width: 1100px) {
+  .public-nav .mobile-menu { display: inline-flex; }
+  .public-nav nav { display: none; position: absolute; top: 105px; left: 0; right: 0; padding: 24px; flex-direction: column; align-items: stretch; background: white; z-index: 40; border-bottom: 1px solid var(--line); }
+  .public-nav nav.open { display: flex; }
   .public-nav nav {
     gap: 16px;
   }

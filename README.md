@@ -23,11 +23,12 @@ Use **Demo controls** to switch between Ada, the administrator, Dr Adebayo and M
 
 - Public programme pages, contact acknowledgement, role chooser and certificate lookup.
 - Candidate sign-up, login, logout, saved browser-local sessions, return-to-application navigation and local account reset.
-- Diploma draft, local document uploads, mock fee, replacement requests, verification, shortlisting and capacity-aware entrance scheduling.
-- Graded registration, mock payment, shuffled timed theory with notation/audio, browser warnings and provisional scoring.
-- A single practical video submission, spoken code, declaration and submission deadline.
+- Seven seeded Diploma applicants, subject-level O'Level grades, local documents, one-action replacement requests, verification, shortlisting and capacity-aware scheduling.
+- Cancellable test checkout, shuffled Grade 5 theory with VexFlow notation/audio, optional live camera preview, active-paper navigation guards and provisional scoring.
+- A single practical video submission, fixed rehearsal code, declaration, live countdown and WAT deadline.
 - Examiner drafts and rubric marking; integrity clearance/referral; eligible-result publication.
-- Delayed sample PDF certificates with QR codes, local cancellation, independent practical appeals and superseded-certificate history.
+- Branded sample PDFs with illustrative signatures, classifications and portable snapshot QRs; local cancellation, independent appeals and superseded-certificate history.
+- Diploma and appeal checkpoints, an answer card, and sourced public programme information with clearly illustrative rehearsal dates.
 
 ## Verification
 
@@ -40,7 +41,7 @@ npx playwright install chromium
 npm run test:e2e -- --workers=2
 ```
 
-Validated on macOS / Node 22: 20 domain/PDF/account tests and 12 Chromium browser checks (1440px desktop and 390px mobile). Browser checks cover sign-up validation, login/logout, session persistence, account reset, return destinations, the connected exam cycle, PDF download, appeals/revocation, timer reload/expiry, actual IndexedDB uploads, Diploma replacement/scheduling, deep links, images and horizontal overflow. Screenshots and failure traces are generated under ignored `test-results/`.
+Validated on macOS / Node 22: **24 unit tests and 16 Chromium browser tests**, plus lint, TypeScript and the production build. Viewports are 1440px desktop and 390px mobile, plus intermediate public-layout widths. Browser checks cover accounts, the connected exam cycle, PDF download, fresh-browser snapshots, appeals/revocation, navigation guards, timer reload/expiry, camera lifecycle with synthetic streams, cancelled checkout, actual IndexedDB uploads, Diploma replacement/scheduling, page titles and layout/assets. Screenshots and failure traces are generated under ignored `test-results/`.
 
 Chromium needs permission to launch normal macOS processes. In the VS Code terminal sandbox, use an approved unsandboxed browser-test run; dependency downloads can use `PLAYWRIGHT_BROWSERS_PATH` in a writable temporary directory.
 
@@ -82,11 +83,11 @@ Candidate deep links redirect to `/login/` when signed out and resume their orig
 
 The **Presentation workspaces** chooser on the account screens and **Demo controls** deliberately bypass login. Candidate, administrator and examiner views still share the same local dataset. Only a salted PBKDF2 password verifier is persisted, never the entered password, but browser storage and route guards provide no production security. Do not use real passwords or personal details. There is no server authentication, email verification or cross-device account recovery.
 
-Zustand metadata uses localStorage key `muson-demo-v1`; selected files use the dedicated `muson-demo-files` IndexedDB database. Reset clears this demo's uploads. Use only synthetic files; this is not a secure storage, identity or retention system. Keep one presenting browser tab. Private browsing/storage restrictions may prevent persistence; bundled media remains available.
+Zustand metadata uses localStorage key `muson-demo-v1`; selected files use the dedicated `muson-demo-files` IndexedDB database. Reset clears this demo's uploads. Use only synthetic files; this is not a secure storage, identity or retention system. A Web Lock allows one active tab; additional tabs wait and rehydrate when ownership transfers. Close waiting tabs before reloading the presenting tab. HTTPS or localhost and a current browser with Web Locks are required. Private browsing/storage restrictions may prevent persistence; bundled media remains available. Load a checkpoint to pick up revised seeds after an update.
 
-Role switching is not authentication. Answer keys and workflow logic are public client code. ID/webcam checks are simulated and capture nothing. Fullscreen and tab warnings cannot secure an examination. Real money, email, video processing, authoritative timing, signatures and tenant isolation are intentionally absent.
+Role switching is not authentication. Answer keys and workflow logic are public client code. ID checks and saved evidence frames are simulated. The optional live webcam preview saves nothing and stops tracks on exit. Fullscreen and tab warnings cannot secure an examination. Real money, email, video processing, authoritative timing, official signatures and tenant isolation are intentionally absent.
 
-`MUSON-DEMO-2026` is an immutable public sample and works on any device after hosting. New certificates and cancellations are local to the presenting browser and do not synchronize. A QR containing `localhost` cannot work on a phone. Standard PDF fonts cover the demonstration names; wider-script names need embedded Unicode fonts before production.
+`MUSON-DEMO-2026` is an immutable Grade 4 public sample. Newly issued QRs include an unsigned sample snapshot so details can be viewed on another device after hosting. This is not authenticated verification or a live registry: cancellations and appeal changes do not synchronize. The issuing browser uses its current local record instead of the snapshot. A QR containing `localhost` cannot work on a phone. Standard PDF fonts cover the demonstration names; wider-script names need embedded Unicode fonts before production.
 
 ## Source layout
 
@@ -105,4 +106,4 @@ Fonts: locally bundled Noto Sans and Tinos, echoing Nardia typography. Icons: Lu
 - Gala photo: https://muson.org/wp-content/uploads/2021/03/Marquess-Studios-at-GALA-Night-476-Copy-min-1536x1024.jpg
 - Piano photo: copied from the adjacent Nardia landing project's `images/figma/hero-piano.jpg`; confirm original licensing before publication.
 
-The eight-second video is an illustrative piano still with generated interval tones, **not an actual candidate performance**. The listening exercise is a generated C-to-G perfect fifth; notation and supporting PDF are synthetic. Regenerate binary samples with `node scripts/generate-demo-assets.mjs` when ffmpeg is installed. Bundled assets are already present, so ffmpeg is not needed to run or host the app.
+The eight-second video is an illustrative piano still with generated interval tones, **not an actual candidate performance**. Supply a consented 45-60 second human recording for rehearsal; the runbook includes the fixed code and recording brief. The listening exercise is a generated C-to-G perfect fifth; the question asks for its inversion. Alto-clef notation is engraved with VexFlow. Regenerate bundled binary samples with `node scripts/generate-demo-assets.mjs` when ffmpeg is installed. Bundled assets are already present, so ffmpeg is not needed to run or host the app.

@@ -22,15 +22,18 @@ import {
   config,
   DAY,
   date,
+  dateTime,
   level,
   money,
   title,
   type Registration,
 } from "@/lib/workflows";
 import { questions } from "@/lib/questions";
+import { Notation } from "@/components/Notation";
+import { CameraPreview } from "@/components/CameraPreview";
 import { asset } from "@/lib/urls";
 import { saveFile, useFileUrl } from "@/lib/files";
-import { downloadCertificate, publicCertificate } from "@/lib/certificates";
+import { achievement, certificateUrl, downloadCertificate, publicCertificate } from "@/lib/certificates";
 import {
   Badge,
   Empty,
@@ -39,6 +42,7 @@ import {
   Heading,
   Notice,
   Stat,
+  MockCheckout,
 } from "@/components/ui";
 
 export function Overview() {
@@ -96,8 +100,9 @@ export function Overview() {
           <div className="eyebrow">DECEMBER 2026 SITTING</div>
           <h2>Your next chapter starts here.</h2>
           <p>
-            Theory and practical entries are open. Complete your registration
-            and prepare for your next grade.
+            {entries.length && entries.every(item => item.paid)
+              ? "Your entries are confirmed. Continue your assessments and follow your progress below."
+              : "Theory and practical entries are open. Complete your registration and prepare for your next grade."}
           </p>
         </div>
         <Go href="/graded-exams">Explore the examinations</Go>
@@ -325,6 +330,7 @@ export function Register() {
   const [subject, setSubject] = useState("Piano");
   const [theory, setTheory] = useState(true);
   const [practical, setPractical] = useState(true);
+  const [checkout, setCheckout] = useState(false);
   const entries = data.registrations.filter(
     (item) => item.candidateId === "ada",
   );
@@ -334,6 +340,7 @@ export function Register() {
       <Heading eyebrow="GRADED EXAMINATIONS" title="Exam registration">
         One sitting. Your next milestone in music.
       </Heading>
+      <MockCheckout key={String(checkout)} open={checkout} amount={unpaid.reduce((sum, entry) => sum + config.fees[entry.kind], 0)} onClose={() => setCheckout(false)} onComplete={() => { run({ type: "pay" }); setCheckout(false); }} />
       <div className="two-column">
         <section>
           {entries.length < 2 && (
@@ -450,7 +457,7 @@ export function Register() {
             </strong>
           </div>
           {unpaid.length > 0 ? (
-            <button className="button" onClick={() => run({ type: "pay" })}>
+            <button className="button" onClick={() => setCheckout(true)}>
               Pay mock fee
               <ArrowRight size={16} />
             </button>
@@ -500,12 +507,15 @@ export function Theory() {
         flag("Fullscreen exited. This event has been recorded.");
     };
     const prevent = (event: Event) => event.preventDefault();
+    const leaving = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ""; };
+    window.addEventListener("beforeunload", leaving);
     document.addEventListener("visibilitychange", visibility);
     document.addEventListener("fullscreenchange", fullscreen);
     document.addEventListener("copy", prevent);
     document.addEventListener("paste", prevent);
     return () => {
       clearInterval(interval);
+      window.removeEventListener("beforeunload", leaving);
       document.removeEventListener("visibilitychange", visibility);
       document.removeEventListener("fullscreenchange", fullscreen);
       document.removeEventListener("copy", prevent);
@@ -581,7 +591,7 @@ export function Theory() {
               [
                 Camera,
                 "Webcam & room check",
-                "Simulated readiness check. No camera recording.",
+                "Optional live preview; no images or video are saved.",
               ],
               [
                 Expand,
@@ -624,6 +634,7 @@ export function Theory() {
             </button>
           </section>
           <aside>
+            <CameraPreview />
             <Notice tone="warning">
               This is a mock assessment. Browser warnings are not secure
               proctoring. No webcam images are captured.
@@ -643,7 +654,7 @@ export function Theory() {
   const question = questions.find(
     (item) => item.id === attempt.order[attempt.index],
   )!;
-  const seconds = Math.max(0, Math.ceil((attempt.deadline - now) / 1000));
+  const seconds = Math.min(config.theoryMinutes * 60, Math.max(0, Math.ceil((attempt.deadline - now) / 1000)));
   return (
     <div className="exam-room">
       <Heading eyebrow={title(entry)} title="Theory examination" />
@@ -656,7 +667,7 @@ export function Theory() {
           {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, "0")}
         </span>
         <span>
-          {Math.max(0, Math.ceil((attempt.questionDeadline - now) / 1000))}s
+          {Math.min(config.questionSeconds, Math.max(0, Math.ceil((attempt.questionDeadline - now) / 1000)))}s
           this question
         </span>
         <button
@@ -673,13 +684,7 @@ export function Theory() {
         <div className="eyebrow">{question.topic}</div>
         <h2>{question.prompt}</h2>
         {question.media === "notation" && (
-          <Image
-            className="notation"
-            src={asset("demo/notation.svg")}
-            alt="Treble clef staff with a note on the middle line"
-            width={320}
-            height={120}
-          />
+          <Notation />
         )}
         {question.media === "audio" && (
           <audio
@@ -742,6 +747,12 @@ export function Practical() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const url = useFileUrl(entry?.file || file, true);
+  const [clock, setClock] = useState(data.now);
+  useEffect(() => {
+    const started = Date.now();
+    const timer = setInterval(() => setClock(data.now + Date.now() - started), 1000);
+    return () => clearInterval(timer);
+  }, [data.now]);
   if (!entry?.paid)
     return (
       <Empty
@@ -752,10 +763,10 @@ export function Practical() {
         Confirm your practical entry to open the video submission window.
       </Empty>
     );
-  const days = Math.max(
-    0,
-    Math.ceil((Date.parse(config.sitting.closesAt) - data.now) / DAY),
-  );
+  const remaining = Math.max(0, Math.floor((Date.parse(config.sitting.closesAt) - Math.max(data.now, clock)) / 1000));
+  const days = Math.floor(remaining / 86400);
+  const timeLeft = `${days}d ${String(Math.floor(remaining / 3600) % 24).padStart(2, "0")}h ${String(Math.floor(remaining / 60) % 60).padStart(2, "0")}m ${String(remaining % 60).padStart(2, "0")}s`;
+  const missingBirthDate = !data.profile.birthDate || !Number.isFinite(Date.parse(data.profile.birthDate));
   return (
     <>
       <Heading
@@ -763,7 +774,7 @@ export function Practical() {
         title={title(entry)}
         action={
           <Badge>
-            {entry.file ? "submitted" : days ? "window open" : "absent"}
+            {entry.file ? "submitted" : remaining ? "window open" : "absent"}
           </Badge>
         }
       >
@@ -789,7 +800,7 @@ export function Practical() {
               Submitted on {date(entry.submittedAt!)}. Your declaration is
               recorded. No replacement upload is permitted.
             </Notice>
-          ) : days ? (
+          ) : remaining ? (
             <>
               <div className="upload">
                 <Upload size={28} color="var(--green)" />
@@ -818,9 +829,11 @@ export function Practical() {
                 <div className="form-actions">
                   <button
                     className="button secondary small"
+                    disabled={busy}
                     onClick={() => {
                       setFile("sample");
                       setFileName("Bundled sample performance.mp4");
+                      setError("");
                     }}
                   >
                     Use sample video
@@ -835,6 +848,8 @@ export function Practical() {
                 </Notice>
               )}
               {fileName && <p>{fileName}</p>}
+              {missingBirthDate && <Notice tone="warning">Add your date of birth before submitting. <Go href="/candidate/profile">Complete My profile</Go></Notice>}
+              {!missingBirthDate && <p className="space-top"><Go href="/candidate/profile">Review birth date and guardian details</Go></p>}
               <label className="check">
                 <input
                   type="checkbox"
@@ -847,7 +862,7 @@ export function Practical() {
               </label>
               <button
                 className="button"
-                disabled={!file || !declaration || busy}
+                disabled={!file || !declaration || busy || missingBirthDate}
                 onClick={() =>
                   run({
                     type: "submit-video",
@@ -871,8 +886,8 @@ export function Practical() {
         </section>
         <aside>
           <div className="eyebrow">SUBMISSION WINDOW</div>
-          <div className="countdown">{days} days remaining</div>
-          <p>Closes {date(config.sitting.closesAt)}</p>
+          <div className="countdown" aria-label="Time remaining">{timeLeft}</div>
+          <p>Closes {dateTime(config.sitting.closesAt)}</p>
           <div className="space-top">
             <div className="eyebrow">YOUR RECORDING CODE</div>
             <div className="code">{entry.code}</div>
@@ -945,10 +960,7 @@ export function Results() {
                   <small> / 100</small>
                 </div>
                 <p>
-                  {(entry.result?.total ?? entry.scores[0].total) >=
-                  config.passMark
-                    ? "Pass"
-                    : "Below pass mark"}{" "}
+                  {achievement(entry.result?.total ?? entry.scores[0].total)}{" "}
                   · {config.sitting.name}
                 </p>
                 {entry.kind === "practical" ? (
@@ -1020,8 +1032,7 @@ export function Results() {
             </div>
             {certificate.id === "public-sample" && (
               <p>
-                Preloaded sample record. This certificate can be checked on
-                another device; live browser-local certificates cannot.
+                Preloaded Grade 4 sample, earned before this Grade 5 sitting.
               </p>
             )}
             <div className="form-actions">
@@ -1033,7 +1044,7 @@ export function Results() {
                 Download sample PDF
               </button>
               <Go
-                href={`/verify?number=${encodeURIComponent(certificate.number)}`}
+                href={`/verify?${new URL(certificateUrl(certificate, "https://example.org")).searchParams}`}
               >
                 Check certificate
               </Go>

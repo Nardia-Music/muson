@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { ArrowRight, CalendarDays, CheckCircle2, FileText } from "lucide-react";
+import { ArrowRight, CalendarDays, CheckCircle2, FileText, Plus, Trash2 } from "lucide-react";
 import { useDemo } from "@/lib/store";
 import {
   config,
@@ -20,6 +20,7 @@ import {
   Heading,
   Notice,
   Steps,
+  MockCheckout,
 } from "@/components/ui";
 
 export function DiplomaApplication() {
@@ -29,10 +30,15 @@ export function DiplomaApplication() {
   const [step, setStep] = useState(0);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const [checkout, setCheckout] = useState(false);
   const editable = ["draft", "needs info"].includes(stored.status);
   const slot = data.slots.find((item) => item.id === stored.slotId);
   const update = (patch: Partial<Application>) =>
     setForm({ ...form, ...patch });
+  const updateSubjects = (subjectGrades: NonNullable<Application["subjectGrades"]>) => {
+    const credits = subjectGrades.filter(row => ["A1", "B2", "B3", "C4", "C5", "C6"].includes(row.grade));
+    update({ subjectGrades, credits: credits.length, english: credits.some(row => row.subject.trim().toLowerCase() === "english language"), sittings: new Set(subjectGrades.map(row => row.sitting)).size });
+  };
   const save = () => {
     const saved = run({ type: "save-application", application: form });
     if (saved) setMessage("Draft saved.");
@@ -76,11 +82,13 @@ export function DiplomaApplication() {
         ]}
         current={editable ? step : 4}
       />
+      <MockCheckout key={String(checkout)} open={checkout} amount={config.fees.application} onClose={() => setCheckout(false)} onComplete={() => { run({ type: "submit-application", id: stored.id }); setCheckout(false); }} />
       {stored.note && (
         <Notice tone={stored.status === "needs info" ? "warning" : "info"}>
           {stored.note}
         </Notice>
       )}
+      {stored.status === "needs info" && step !== 2 && <button className="button secondary" onClick={() => setStep(2)}>Replace requested documents<ArrowRight size={16} /></button>}
       {!editable ? (
         <div className="panel">
           <CheckCircle2 size={34} color="var(--green)" />
@@ -90,7 +98,7 @@ export function DiplomaApplication() {
               : "Your application is with MUSON."}
           </h2>
           <p>
-            {stored.name} · {stored.instrument} · Reference {stored.id}
+            {stored.name} · {stored.instrument} · Reference MUSON-DIP-2027-001
           </p>
           {slot ? (
             <>
@@ -125,7 +133,10 @@ export function DiplomaApplication() {
           className="panel"
           onSubmit={(event) => {
             event.preventDefault();
-            if (save()) run({ type: "submit-application", id: stored.id });
+            if (save()) {
+              if (stored.paid) run({ type: "submit-application", id: stored.id });
+              else setCheckout(true);
+            }
           }}
         >
           {step === 0 && (
@@ -162,12 +173,25 @@ export function DiplomaApplication() {
           {step === 1 && (
             <>
               <h2>Entry qualifications</h2>
+              <h3>O&apos;Level subject grades</h3>
+              <div className="table-wrap space-top"><table>
+                <thead><tr><th>SUBJECT</th><th>GRADE</th><th>SITTING</th><th /></tr></thead>
+                <tbody>{(form.subjectGrades || []).map((row, index) => <tr key={index}>
+                  <td><input aria-label={`Subject ${index + 1}`} value={row.subject} onChange={event => updateSubjects(form.subjectGrades!.map((item, position) => position === index ? { ...item, subject: event.target.value } : item))} /></td>
+                  <td><select aria-label={`Grade for subject ${index + 1}`} value={row.grade} onChange={event => updateSubjects(form.subjectGrades!.map((item, position) => position === index ? { ...item, grade: event.target.value } : item))}>{["A1", "B2", "B3", "C4", "C5", "C6", "D7", "E8", "F9"].map(grade => <option key={grade}>{grade}</option>)}</select></td>
+                  <td><select aria-label={`Sitting for subject ${index + 1}`} value={row.sitting} onChange={event => updateSubjects(form.subjectGrades!.map((item, position) => position === index ? { ...item, sitting: Number(event.target.value) } : item))}><option value={1}>1</option><option value={2}>2</option></select></td>
+                  <td><button className="icon-button" type="button" aria-label={`Remove subject ${index + 1}`} title="Remove subject" onClick={() => updateSubjects(form.subjectGrades!.filter((_, position) => position !== index))}><Trash2 size={16} /></button></td>
+                </tr>)}</tbody>
+              </table></div>
+              <button className="button secondary small" type="button" disabled={(form.subjectGrades?.length || 0) >= 9} onClick={() => updateSubjects([...(form.subjectGrades || []), { subject: "", grade: "C6", sitting: 1 }])}><Plus size={16} />Add subject</button>
+              <p className="space-top">{form.credits} credits in {form.sittings} sitting(s). English Language: {form.english ? "credit achieved" : "credit required"}.</p>
               <div className="form-grid">
                 <Field label="O'Level / SSCE sittings">
                   <input
                     type="number"
                     min={1}
                     max={2}
+                    readOnly={Boolean(form.subjectGrades)}
                     value={form.sittings}
                     onChange={(event) =>
                       update({ sittings: Number(event.target.value) })
@@ -179,6 +203,7 @@ export function DiplomaApplication() {
                     type="number"
                     min={5}
                     max={9}
+                    readOnly={Boolean(form.subjectGrades)}
                     value={form.credits}
                     onChange={(event) =>
                       update({ credits: Number(event.target.value) })
@@ -222,6 +247,7 @@ export function DiplomaApplication() {
                 <input
                   type="checkbox"
                   checked={form.english}
+                  disabled={Boolean(form.subjectGrades)}
                   onChange={(event) =>
                     update({ english: event.target.checked })
                   }
@@ -349,7 +375,7 @@ function DocumentView({ document }: { document: DocumentRecord }) {
     <div>
       <div className="section-title">
         <strong>{document.label}</strong>
-        <Badge>{document.status}</Badge>
+        <Badge>{document.status === "rejected" ? "replacement required" : document.status}</Badge>
       </div>
       {document.name && <small>{document.name}</small>}
       {document.note && <Notice tone="warning">{document.note}</Notice>}
@@ -426,7 +452,7 @@ export function ApplicationQueue() {
                 <tr key={item.id}>
                   <td>
                     <strong>{item.name}</strong>
-                    <small>{item.id}</small>
+                    <small>MUSON-DIP-2027-{String(data.applications.indexOf(item) + 1).padStart(3, "0")}</small>
                   </td>
                   <td>Diploma</td>
                   <td>{item.instrument}</td>

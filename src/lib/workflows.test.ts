@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   createSeed,
+  checkpoint,
   transition,
   config,
   eligible,
@@ -19,6 +20,13 @@ function registered() {
 }
 
 describe("exam lifecycle", () => {
+  it("distinguishes a missing birth date from a minor and accepts the eighteenth birthday", () => {
+    const state = registered();
+    state.profile.birthDate = "";
+    expect(() => transition(state, { type: "submit-video", id: "ada-practical", file: "sample", declaration: true })).toThrow(/date of birth/);
+    state.profile.birthDate = "2008-12-03";
+    expect(transition(state, { type: "submit-video", id: "ada-practical", file: "sample", declaration: true }).registrations.find(item => item.id === "ada-practical")?.file).toBe("sample");
+  });
   it("locks expired answers and blocks demo-clock changes during an attempt", () => {
     let state = registered();
     state = transition(state, { type: "start-theory", id: "ada-theory", now: 1000 });
@@ -222,6 +230,11 @@ describe("exam lifecycle", () => {
 });
 
 describe("Diploma admissions", () => {
+  it("seeds a useful queue and exposes Diploma and appeal rehearsal checkpoints", () => {
+    expect(createSeed().applications).toHaveLength(7);
+    expect(checkpoint("diploma").applications[0].status).toBe("submitted");
+    expect(checkpoint("appeal").appeals[0].status).toBe("awaiting second mark");
+  });
   function submitted() {
     let state = createSeed();
     state.role = "candidate";
@@ -238,10 +251,20 @@ describe("Diploma admissions", () => {
     state.applications[0].sittings = 1; state.applications[0].english = false;
     expect(() => transition(state, { type: "submit-application", id: "ada-diploma" })).toThrow(/English/);
   });
+  it("derives credit totals from entered subject grades", () => {
+    const state = createSeed();
+    state.role = "candidate";
+    const application = structuredClone(state.applications[0]);
+    application.subjectGrades![0].grade = "D7";
+    const updated = transition(state, { type: "save-application", application }).applications[0];
+    expect(updated.credits).toBe(4);
+    expect(updated.english).toBe(false);
+  });
   it("retains unchanged verification and charges only once on replacement", () => {
     let state = submitted(); state.role = "admin";
     state = transition(state, { type: "document", id: "ada-diploma", documentId: "doc-1", status: "verified", note: "Verified original" });
     state = transition(state, { type: "document", id: "ada-diploma", documentId: "doc-0", status: "rejected", note: "Unreadable scan" });
+    expect(state.applications[0].status).toBe("needs info");
     state = transition(state, { type: "review-application", id: "ada-diploma", status: "needs info", note: "Replace results scan" });
     state.role = "candidate";
     const application = structuredClone(state.applications[0]); application.documents[0].file = "sample-replacement";

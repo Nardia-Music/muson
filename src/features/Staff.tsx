@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   FileCheck2,
   ShieldCheck,
+  UserRound,
 } from "lucide-react";
 import { useDemo } from "@/lib/store";
 import {
@@ -27,6 +28,7 @@ import {
   Heading,
   Notice,
   Stat,
+  ConfirmDialog,
 } from "@/components/ui";
 
 export function AdminOverview() {
@@ -186,7 +188,7 @@ export function GradingQueue() {
                 <tr key={entry.id}>
                   <td>
                     <strong>{entry.candidate}</strong>
-                    <small>{entry.id}</small>
+                    <small>{entry.code}</small>
                   </td>
                   <td>{title(entry)}</td>
                   <td>{date(entry.submittedAt!)}</td>
@@ -417,6 +419,18 @@ function IntegrityItem({ entry }: { entry: Registration }) {
           <li key={index}>{event}</li>
         ))}
       </ul>
+      {entry.id === "kehinde-theory" && <>
+        <h3 className="space-top">Illustrative webcam evidence</h3>
+        <div className="evidence-grid">
+          {["11:00 WAT - readiness", "11:03 WAT - candidate away", "11:04 WAT - candidate returned"].map((caption, index) => <figure key={caption}>
+            <div className="mock-frame" role="img" aria-label={`Simulated webcam frame: ${caption}`}>
+              {index !== 1 && <UserRound size={46} />}<span>SIMULATED FRAME</span>
+            </div>
+            <figcaption>{caption}</figcaption>
+          </figure>)}
+        </div>
+        <Notice>Seeded illustrations, not captured images or evidence of misconduct. Live preview images are never stored.</Notice>
+      </>}
       {entry.result ? (
         <Notice tone="success">
           Review completed and result published. {entry.reviewNote}
@@ -466,6 +480,7 @@ function IntegrityItem({ entry }: { entry: Registration }) {
 
 export function PublishResults() {
   const { data, run } = useDemo();
+  const [confirming, setConfirming] = useState(false);
   const ready = data.registrations.filter(
     (item) => eligible(item) && !item.result,
   );
@@ -478,14 +493,7 @@ export function PublishResults() {
           <button
             className="button"
             disabled={!ready.length}
-            onClick={() => {
-              if (
-                confirm(
-                  `Publish ${ready.length} eligible results? Held entries will remain unpublished.`,
-                )
-              )
-                run({ type: "publish" });
-            }}
+            onClick={() => setConfirming(true)}
           >
             Publish {ready.length} results
             <ArrowRight size={16} />
@@ -494,6 +502,9 @@ export function PublishResults() {
       >
         Only paid, marked and cleared entries can be released.
       </Heading>
+      <ConfirmDialog open={confirming} title="Publish eligible results?" confirmLabel="Publish results" onClose={() => setConfirming(false)} onConfirm={() => { run({ type: "publish" }); setConfirming(false); }}>
+        <p>{ready.length} results will be released to candidates. Held entries will remain unpublished.</p>
+      </ConfirmDialog>
       <Notice>
         Unpaid, unmarked or unresolved theory sessions are held. Publishing
         releases eligible results only.
@@ -653,7 +664,7 @@ export function AdminAppeals() {
                     <div key={score.id}>
                       <small>
                         {index ? "Second examiner" : "Original examiner"} ·{" "}
-                        {score.examiner}
+                        {score.examiner === "examiner-2" ? "Ms Sarah Williams" : score.examiner === "examiner" ? "Dr Tunde Adebayo" : "Automatic marking"}
                       </small>
                       <h2 className="space-top">{score.total}%</h2>
                       <p>{score.comments}</p>

@@ -66,14 +66,38 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [menu, setMenu] = useState(false);
   const [controls, setControls] = useState(false);
   const [notifications, setNotifications] = useState(false);
+  const [activeTab, setActiveTab] = useState(false);
   const section = pathname.split("/")[1];
   const portal = ["candidate", "admin", "examiner"].includes(section);
   const needsLogin = section === "candidate" && !signedIn;
+  const activePaper = data.registrations.some(item => item.attempt && !item.attempt.submitted);
   useEffect(() => {
-    Promise.resolve(useDemo.persist.rehydrate()).finally(ready);
+    const controller = new AbortController();
+    let release: (() => void) | undefined;
+    if (!navigator.locks) return;
+    void navigator.locks.request("muson-demo-workspace", { signal: controller.signal }, async () => {
+      if (controller.signal.aborted) return;
+      const held = new Promise<void>((resolve) => { release = resolve; });
+      await useDemo.persist.rehydrate();
+      if (!controller.signal.aborted) {
+        ready();
+        setActiveTab(true);
+      }
+      await held;
+    }).catch((failure) => {
+      if (!controller.signal.aborted) console.warn("Workspace lock unavailable", failure);
+    });
+    return () => {
+      controller.abort();
+      release?.();
+    };
   }, [ready]);
   useEffect(() => {
-    if (!hydrated) return;
+    if (!hydrated || !activeTab) return;
+    if (activePaper && pathname.replace(/\/$/, "") !== "/candidate/theory") {
+      router.replace("/candidate/theory");
+      return;
+    }
     if (needsLogin) {
       router.replace(`/login?next=${encodeURIComponent(pathname + window.location.search)}`);
       return;
@@ -85,7 +109,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       run({ type: "role", role: "admin" });
     if (section === "examiner" && !role.startsWith("examiner"))
       run({ type: "role", role: "examiner" });
-  }, [section, hydrated, run, needsLogin, pathname, router]);
+  }, [section, hydrated, run, needsLogin, pathname, router, activeTab, activePaper]);
   const changeRole = (role: Role) => {
     enterDemo(role);
     router.push(
@@ -103,6 +127,13 @@ export function AppShell({ children }: { children: ReactNode }) {
       : section === "examiner"
         ? examinerLinks
         : candidateLinks;
+  if (!activeTab) return (
+    <main className="loading" role="status">
+      <h2>Opening your MUSON workspace</h2>
+      <p>If MUSON is open in another tab, close that tab to continue here. Use one tab to keep your work in sync.</p>
+      <small>A current browser and HTTPS or localhost are required.</small>
+    </main>
+  );
   const brand = (
     <Link href="/" className="brand">
       <Image
@@ -117,7 +148,13 @@ export function AppShell({ children }: { children: ReactNode }) {
     </Link>
   );
   return (
-    <>
+    <div onClickCapture={(event) => {
+      if (activePaper && (event.target as Element).closest("a")) {
+        event.preventDefault();
+        event.stopPropagation();
+        useDemo.setState({ error: "Submit your theory paper before leaving the examination." });
+      }
+    }}>
       <div className="demo-bar">
         <span>
           <i /> Presentation edition{" "}
@@ -133,6 +170,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             View as
             <select
               aria-label="View as"
+              disabled={activePaper}
               value={data.role}
               onChange={(event) => changeRole(event.target.value as Role)}
             >
@@ -148,6 +186,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </span>
           <button
             className="button secondary small"
+            disabled={activePaper}
             onClick={() => run({ type: "advance", days: 4 })}
           >
             Advance 4 days
@@ -157,16 +196,17 @@ export function AppShell({ children }: { children: ReactNode }) {
             Load checkpoint
             <select
               aria-label="Load checkpoint"
+              disabled={activePaper}
               value=""
               onChange={(event) => {
                 const value = event.target.value as
-                  "start" | "registered" | "marking" | "results";
+                  "start" | "registered" | "marking" | "results" | "diploma" | "appeal";
                 if (
                   value &&
                   confirm("Replace current demo progress and remove any local account with this checkpoint?")
                 ) {
                   reset(value);
-                  router.push(value === "marking" ? "/examiner" : "/candidate");
+                  router.push(value === "diploma" ? "/admin/applications" : value === "marking" || value === "appeal" ? "/examiner" : "/candidate");
                 }
               }}
             >
@@ -175,12 +215,15 @@ export function AppShell({ children }: { children: ReactNode }) {
               <option value="registered">Paid entries</option>
               <option value="marking">Submitted assessments</option>
               <option value="results">Results & certificates</option>
+              <option value="diploma">Diploma / submitted application</option>
+              <option value="appeal">Appeal / independent review</option>
             </select>
           </label>
           <button
             className="icon-button"
             title="Reset all demo data"
             aria-label="Reset all demo data"
+            disabled={activePaper}
             onClick={() => {
               if (confirm("Reset all demo progress, local account and uploads?")) {
                 reset("start");
@@ -208,7 +251,9 @@ export function AppShell({ children }: { children: ReactNode }) {
           <nav className={menu ? "open" : ""} onClick={() => setMenu(false)}>
             <Link href="/diploma">Diploma School</Link>
             <Link href="/graded-exams">Graded Exams</Link>
+            <Link href="/basic-school">Basic School</Link>
             <Link href="/about">About MUSON</Link>
+            <Link href="/contact">Contact</Link>
             <Link href="/verify">Check a certificate</Link>
             <Link className="button small" href={signedIn ? "/candidate" : "/login"}>
               {signedIn ? "My portal" : "Log in"}
@@ -228,7 +273,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 : "Examiner portal"}
           </span>
           <div className="top-actions">
-            {signedIn && <button className="icon-button" title="Log out" aria-label="Log out" onClick={() => {
+            {signedIn && <button className="icon-button" title="Log out" aria-label="Log out" disabled={activePaper} onClick={() => {
               signOut();
               setNotifications(false);
               setMenu(false);
@@ -363,7 +408,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </button>
         </div>
       )}
-    </>
+    </div>
   );
 }
 

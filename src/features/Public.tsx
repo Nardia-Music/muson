@@ -18,12 +18,12 @@ import {
   Search,
   ShieldCheck,
 } from "lucide-react";
-import { asset, verificationUrl } from "@/lib/urls";
+import { asset } from "@/lib/urls";
 import { useDemo } from "@/lib/store";
 import { candidateDestination } from "@/lib/auth";
 import { clearFiles } from "@/lib/files";
 import { config, date, money, type Role } from "@/lib/workflows";
-import { publicCertificate } from "@/lib/certificates";
+import { achievement, certificateUrl, publicCertificate, readCertificateSnapshot } from "@/lib/certificates";
 import { Badge, Field, Go, Notice } from "@/components/ui";
 
 export function Home() {
@@ -48,8 +48,8 @@ export function Home() {
             Education that stays with us.
           </p>
           <div className="form-actions">
-            <Link href="/diploma" className="button white">
-              Explore Diploma School
+            <Link href="/candidate/application" className="button white">
+              Apply now
               <ArrowRight size={17} />
             </Link>
             <Link href="/graded-exams" className="text-link">
@@ -195,6 +195,8 @@ export function Diploma() {
             2027 intake dates and fees shown here are illustrative and subject
             to MUSON approval.
           </Notice>
+          <h3>Key dates · rehearsal calendar</h3>
+          <dl className="key-dates"><dt>Applications open</dt><dd>1 November 2026</dd><dt>Applications close</dt><dd>8 December 2026</dd><dt>Entrance examination</dt><dd>12 December 2026</dd><dt>Intake</dt><dd>2027 · dates to be confirmed by MUSON</dd></dl>
           <Link className="button" href="/candidate/application">
             Start application
             <ArrowRight size={16} />
@@ -235,9 +237,10 @@ export function GradedExams() {
           <h2>Progress, recognised.</h2>
           <p>
             MUSON offers theory and practical examinations from Preparatory to
-            Grade 8. Sittings are planned for May and December; this
-            presentation uses December 2026.
+            Grade 8. MUSON&apos;s published calendar currently lists November 2026.
+            This presentation uses a separate, illustrative December 2026 sitting.
           </p>
+          <a className="text-link" href="https://muson.org/muson-graded-examinations/" target="_blank" rel="noreferrer">Official examination calendar<ArrowUpRight size={16} /></a>
           <div className="equal-columns">
             <div>
               <GraduationCap size={28} color="var(--green)" />
@@ -270,14 +273,14 @@ export function GradedExams() {
           </Link>
         </div>
         <aside>
-          <h2>December 2026</h2>
+          <h2>December 2026 · demo sitting</h2>
           <div className="event-row">
             <CalendarDays size={24} />
             <div>
               <h3>1–30 December</h3>
               <p>
-                30-day practical submission window, closing 31 December at 00:00
-                UTC.
+                30-day practical submission window, closing 31 December at 01:00
+                WAT.
               </p>
             </div>
           </div>
@@ -298,21 +301,22 @@ export function GradedExams() {
 }
 
 export function Verify() {
-  const query = useSearchParams().get("number") || "";
+  const params = useSearchParams();
+  const query = params.get("number") || "";
   const { data } = useDemo();
   const [number, setNumber] = useState(query);
   const [lookup, setLookup] = useState(query);
   const [qr, setQr] = useState("");
   const certificate =
     data.certificates.find((item) => item.number === lookup) ||
-    (lookup === publicCertificate.number ? publicCertificate : undefined);
+    (lookup === publicCertificate.number ? publicCertificate : undefined) ||
+    (lookup === query ? readCertificateSnapshot(params.get("record"), lookup) : undefined);
+  const displayed = certificate || publicCertificate;
+  const shareUrl = certificateUrl(displayed, process.env.NEXT_PUBLIC_SITE_ORIGIN || (typeof window !== "undefined" ? window.location.origin : "https://example.org"));
   useEffect(() => {
     let active = true;
     QRCode.toDataURL(
-      verificationUrl(
-        publicCertificate.number,
-        process.env.NEXT_PUBLIC_SITE_ORIGIN || window.location.origin,
-      ),
+      shareUrl,
       { margin: 1, width: 180 },
     ).then((value) => {
       if (active) setQr(value);
@@ -320,7 +324,7 @@ export function Verify() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [shareUrl]);
   return (
     <PublicPage
       eyebrow="CERTIFICATE REGISTRY · DEMONSTRATION"
@@ -357,7 +361,7 @@ export function Verify() {
                   <Badge>{certificate.status}</Badge>
                 </div>
                 <h2>
-                  {certificate.status === "valid"
+                  {certificate.id === "shared-snapshot" ? "Shared sample certificate" : certificate.status === "valid"
                     ? "Valid sample certificate"
                     : `Certificate ${certificate.status}`}
                 </h2>
@@ -367,18 +371,20 @@ export function Verify() {
                   <strong>{certificate.candidate}</strong>
                 </div>
                 <p>
-                  {certificate.exam} · Grade {certificate.grade}
+                  {certificate.exam}
                 </p>
                 <p>
-                  Score: {certificate.mark}% · Issued{" "}
+                  {achievement(certificate.mark)} · Score: {certificate.mark}% · Issued{" "}
                   {date(certificate.issuedAt)}
                 </p>
                 <Notice
                   tone={certificate.status === "valid" ? "success" : "warning"}
                 >
-                  {certificate.id === "public-sample"
+                  {certificate.id === "shared-snapshot"
+                    ? "Shared snapshot, not an authenticated record. Later cancellations or appeals are not reflected here."
+                    : certificate.id === "public-sample"
                     ? "Static sample record. This is not a real qualification."
-                    : "Browser-local demo record. Changes are not shared with other devices."}
+                    : "Current record in this browser. Its QR shares a snapshot for viewing on another device."}
                 </Notice>
               </section>
             ) : (
@@ -396,9 +402,9 @@ export function Verify() {
           <span className="sample-mark">
             PUBLIC SAMPLE · NOT AN OFFICIAL CERTIFICATE
           </span>
-          <h2>Scan the sample</h2>
-          <h3>{publicCertificate.candidate}</h3>
-          <p>Grade 5 · Music Theory</p>
+          <h2>Scan the certificate</h2>
+          <h3>{displayed.candidate}</h3>
+          <p>{displayed.exam}</p>
           {qr && (
             <Image
               src={qr}
@@ -408,7 +414,7 @@ export function Verify() {
               unoptimized
             />
           )}
-          <p>{publicCertificate.number}</p>
+          <p>{displayed.number}</p>
           <button
             className="button secondary small space-top"
             onClick={() => {
@@ -420,8 +426,7 @@ export function Verify() {
             <ArrowRight size={14} />
           </button>
           <Notice>
-            This preloaded record works across devices once hosted. A localhost
-            QR cannot be opened from a phone.
+            Sample record for presentation. Not an official MUSON qualification.
           </Notice>
         </aside>
       </div>
@@ -468,16 +473,24 @@ export function About() {
     >
       <div className="two-column">
         <div>
-          <h2>Rooted in music. Open to possibility.</h2>
+          <h2>Our history</h2>
           <p>
             MUSON nurtures musical talent through teaching, examinations and
             performance. Its Centre in Onikan brings students, professional
             musicians and audiences together.
           </p>
           <p>
-            From a first lesson to the concert stage, musical education sits at
-            the heart of the Society&apos;s work.
+            Founded in 1983, the Society grew from a shared commitment to classical music.
+            Its founders included Akintola Williams, Louis Mbanefo, Ayo Rosiji,
+            Rasheed Gbadamosi and Francesca Emanuel.
           </p>
+          <h3>Board of trustees</h3>
+          <p>Louis Mbanefo (SAN), Chairman; Femi Adeniyi-Williams, Vice-Chairman; Adeyemi Akisanya, Honorary Secretary.</p>
+          <a className="text-link" href="https://muson.org/board-of-trustees/" target="_blank" rel="noreferrer">MUSON&apos;s current trustee directory<ArrowUpRight size={16} /></a>
+          <h3 className="space-top">Patrons & partners</h3>
+          <p>The MTN Foundation supports the Diploma programme. Please contact the Society for its current patron directory.</p>
+          <h3>School management</h3>
+          <p>The school handles programme, tuition and admissions enquiries. Current management appointments can be confirmed directly with MUSON.</p>
           <Go href="/contact">Visit the MUSON Centre</Go>
         </div>
         <Image

@@ -1,5 +1,22 @@
 import { test, expect } from "@playwright/test";
 
+test("a second tab waits and restores the latest state after the active tab closes", async ({ page, context }) => {
+  await page.goto("/login/");
+  await page.getByText("Presentation workspaces", { exact: true }).click();
+  await page.getByRole("button", { name: "Enter candidate demo" }).click();
+  await expect(page).toHaveURL(/\/candidate\/?$/);
+  await page.goto("/candidate/register/");
+  await expect(page.getByRole("button", { name: "Add exam entries" })).toBeVisible();
+  const second = await context.newPage();
+  await second.goto("/candidate/");
+  await expect(second.getByText(/If MUSON is open in another tab/)).toBeVisible();
+  await expect(second.getByRole("button", { name: "Demo controls" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Add exam entries" }).click();
+  await page.close();
+  await expect(second.getByRole("heading", { name: "Welcome back, Ada." })).toBeVisible();
+  expect(await second.evaluate(() => JSON.parse(localStorage.getItem("muson-demo-v1")!).state.data.registrations.filter((entry: { candidateId: string }) => entry.candidateId === "ada").length)).toBe(2);
+});
+
 test("public deep links, assets, sample verification and responsive layout", async ({ page }, info) => {
   const errors: string[] = [];
   page.on("pageerror", error => errors.push(error.message));
@@ -11,17 +28,26 @@ test("public deep links, assets, sample verification and responsive layout", asy
     const response = await page.goto(path);
     expect(response?.status()).toBe(200);
     await expect(page.locator("h1")).toBeVisible();
+    if (path !== "/") await expect(page).not.toHaveTitle("MUSON | Music, Education & Examinations");
     await expect.poll(() => page.locator("img").evaluateAll(images => images.every(image => image instanceof HTMLImageElement && image.complete && image.naturalWidth > 0))).toBe(true);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     if (["/", "/candidate/", "/admin/"].includes(path)) await page.screenshot({ path: info.outputPath(`${path.replaceAll("/", "") || "home"}.png`), fullPage: true });
   }
   await page.goto("/verify/?number=MUSON-DEMO-2026");
+  await expect(page).toHaveTitle("Certificate verification | MUSON");
   await expect(page.getByRole("heading", { name: "Valid sample certificate" })).toBeVisible();
   await expect(page.getByRole("img", { name: /QR code/ })).toBeVisible();
   await page.getByLabel("Certificate number").fill("NOT-A-CERTIFICATE");
   await page.getByRole("button", { name: "Verify", exact: true }).click();
   await expect(page.getByText(/No record found/)).toBeVisible();
   for (const path of ["/demo/interval.wav", "/demo/notation.svg", "/demo/document.pdf", "/demo/performance.mp4"]) expect((await page.request.get(path)).status()).toBe(200);
+  if (info.project.name === "desktop") {
+    await page.goto("/");
+    for (const width of [800, 1024, 1200, 1440]) {
+      await page.setViewportSize({ width, height: 1000 });
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    }
+  }
   expect(errors).toEqual([]);
 });
 

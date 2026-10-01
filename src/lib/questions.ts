@@ -8,85 +8,18 @@ export type Question = {
 };
 
 const bank: [string, string, string[], string, Question["media"]?][] = [
-  [
-    "pitch",
-    "Name the note shown on the treble staff.",
-    ["B", "D", "F", "A"],
-    "Pitch",
-    "notation",
-  ],
-  [
-    "audio",
-    "Listen to the two notes. Which interval do you hear?",
-    ["Perfect fifth", "Minor second", "Major third", "Octave"],
-    "Listening",
-    "audio",
-  ],
-  [
-    "key",
-    "How many sharps are in the key signature of D major?",
-    ["Two", "One", "Three", "Four"],
-    "Key signatures",
-  ],
-  [
-    "relative",
-    "What is the relative minor of C major?",
-    ["A minor", "C minor", "E minor", "D minor"],
-    "Keys",
-  ],
-  [
-    "time",
-    "How many crotchet beats are in one bar of 3/4?",
-    ["Three", "Two", "Four", "Six"],
-    "Rhythm",
-  ],
-  [
-    "tempo",
-    "What does allegro indicate?",
-    ["A fast tempo", "Very softly", "Gradually slower", "Detached notes"],
-    "Performance directions",
-  ],
-  [
-    "chord",
-    "Which notes form a C major triad?",
-    ["C, E, G", "C, E-flat, G", "C, F, A", "C, D, G"],
-    "Harmony",
-  ],
-  [
-    "dynamic",
-    "What does crescendo ask the performer to do?",
-    [
-      "Gradually get louder",
-      "Gradually get softer",
-      "Speed up",
-      "Stop playing",
-    ],
-    "Dynamics",
-  ],
-  [
-    "rest",
-    "A minim rest lasts how many crotchet beats?",
-    ["Two", "One", "Three", "Four"],
-    "Rhythm",
-  ],
-  [
-    "cadence",
-    "Which chord progression forms a perfect cadence?",
-    ["V to I", "IV to I", "I to V", "V to VI"],
-    "Harmony",
-  ],
-  [
-    "compound",
-    "How many dotted-crotchet beats are in 6/8?",
-    ["Two", "Three", "Six", "Four"],
-    "Time signatures",
-  ],
-  [
-    "leading",
-    "What is the leading note in G major?",
-    ["F-sharp", "F", "G", "A"],
-    "Scales",
-  ],
+  ["pitch", "The notes are written in alto clef. What is the ascending interval from the lower note to the upper note?", ["Minor sixth", "Major sixth", "Perfect fifth", "Minor seventh"], "Clefs and intervals", "notation"],
+  ["audio", "Listen to the ascending interval. Which interval results when it is inverted?", ["Perfect fourth", "Perfect fifth", "Major third", "Minor sixth"], "Interval inversion", "audio"],
+  ["key", "Which minor key has a key signature of five sharps?", ["G-sharp minor", "C-sharp minor", "D-sharp minor", "F-sharp minor"], "Key signatures"],
+  ["relative", "Which is the descending form of G melodic minor in its conventional classical form?", ["G, F, E-flat, D, C, B-flat, A, G", "G, F-sharp, E, D, C, B-flat, A, G", "G, F-sharp, E-flat, D, C, B-flat, A, G", "G, F, E, D, C, B, A, G"], "Minor scales"],
+  ["time", "A bar of 9/8 contains two dotted crotchets followed by one quaver. Which single rest completes the bar?", ["Crotchet rest", "Quaver rest", "Dotted-crotchet rest", "Minim rest"], "Compound metre"],
+  ["tempo", "What does poco rallentando e diminuendo mean?", ["Gradually a little slower and softer", "Immediately much slower and louder", "Gradually faster and softer", "Maintain speed and play very softly"], "Performance directions"],
+  ["chord", "In C major, a chord has E in the bass with G and C above it. Identify the chord and inversion.", ["Tonic triad in first inversion", "Tonic triad in second inversion", "Mediant triad in root position", "Subdominant triad in first inversion"], "Triads and inversions"],
+  ["dynamic", "Which notes form the dominant seventh chord in B minor?", ["F-sharp, A-sharp, C-sharp, E", "F-sharp, A, C-sharp, E", "B, D, F-sharp, A", "F-sharp, A-sharp, C-sharp, E-sharp"], "Dominant sevenths"],
+  ["rest", "A B-flat clarinet plays written F-sharp. What is the sounding pitch?", ["E", "G-sharp", "F-sharp", "E-flat"], "Transposing instruments"],
+  ["cadence", "In A minor, the chords E major followed by F major form which cadence?", ["Interrupted cadence", "Perfect cadence", "Plagal cadence", "Imperfect cadence"], "Cadences in minor keys"],
+  ["compound", "A melody in D major is transposed up a perfect fifth. What is the new key and its key signature?", ["A major: three sharps", "G major: one sharp", "B major: five sharps", "A minor: no sharps or flats"], "Transposition"],
+  ["leading", "Which accidental is required for the leading note of E harmonic minor?", ["D-sharp", "D-natural", "C-sharp", "F-double-sharp"], "Harmonic minor"],
 ];
 
 export const questions: Question[] = bank.map(

@@ -18,10 +18,11 @@ test.beforeEach(async ({ page }) => {
   await expect(page).toHaveURL(/\/candidate\/?$/);
 });
 
-test("connected exam, publication, PDF, appeal and revocation", async ({ page }, info) => {
+test("connected exam, publication, PDF, appeal and revocation", async ({ page, browser }, info) => {
   await page.goto("/candidate/register/");
   await page.getByRole("button", { name: "Add exam entries" }).click();
   await page.getByRole("button", { name: /Pay.*mock|mock.*payment/i }).click();
+  await page.getByRole("button", { name: "Complete test payment" }).click();
   await page.goto("/candidate/theory/");
   for (const checkbox of await page.getByRole("checkbox").all()) await checkbox.check();
   await page.getByRole("button", { name: "Begin examination" }).click();
@@ -30,6 +31,10 @@ test("connected exam, publication, PDF, appeal and revocation", async ({ page },
     await expect(page.getByText(`Question ${index + 1} of 12`, { exact: true })).toBeVisible();
     const prompt = await page.locator(".question h2").textContent();
     const question = questions.find(item => item.prompt === prompt)!;
+    if (question.id === "pitch") {
+      await expect(page.locator(".notation svg")).toBeVisible();
+      await page.screenshot({ path: info.outputPath("theory-notation.png"), fullPage: true });
+    }
     seen.add(question.id);
     await page.getByRole("radio", { name: question.correct, exact: true }).check();
     await page.getByRole("button", { name: index === 11 ? "Finish paper" : "Next question", exact: true }).click();
@@ -60,6 +65,7 @@ test("connected exam, publication, PDF, appeal and revocation", async ({ page },
   await page.goto("/admin/results/");
   await expect(page.getByRole("row").filter({ hasText: "Kehinde Bello" })).toContainText("flagged");
   await page.getByRole("button", { name: "Publish 2 results" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Publish results", exact: true }).click();
   await page.goto("/admin/certificates/");
   await page.getByRole("button", { name: "Issue certificate" }).first().click();
   await expect(page.locator(".error-toast")).toContainText("3 to 7 days");
@@ -75,6 +81,14 @@ test("connected exam, publication, PDF, appeal and revocation", async ({ page },
   const pdf = await PDFDocument.load(await readFile((await download.path())!));
   expect(pdf.getPageCount()).toBe(1);
   await page.screenshot({ path: info.outputPath("results.png"), fullPage: true });
+  const shareLink = await page.getByRole("link", { name: "Check certificate" }).first().getAttribute("href");
+  const freshContext = await browser.newContext();
+  try {
+    const freshPage = await freshContext.newPage();
+    await freshPage.goto(new URL(shareLink!, page.url()).href);
+    await expect(freshPage.getByRole("heading", { name: "Shared sample certificate" })).toBeVisible();
+    await expect(freshPage.getByText(/Shared snapshot, not an authenticated record/i)).toBeVisible();
+  } finally { await freshContext.close(); }
   await page.goto("/verify/?number=MUSON-2026-1001");
   await expect(page.getByRole("heading", { name: "Valid sample certificate" })).toBeVisible();
   await page.goto("/candidate/appeals/");
@@ -104,6 +118,12 @@ test("attempt survives reload and expires exactly once", async ({ page }) => {
   for (const checkbox of await page.getByRole("checkbox").all()) await checkbox.check();
   await page.getByRole("button", { name: "Begin examination" }).click();
   await expect(page.locator(".question")).toBeVisible();
+  await page.locator(".brand").first().click();
+  await expect(page).toHaveURL(/\/candidate\/theory\/?$/);
+  await expect(page.locator(".error-toast")).toContainText("Submit your theory paper before leaving");
+  await page.getByRole("button", { name: "Demo controls" }).click();
+  await expect(page.getByLabel("Load checkpoint")).toBeDisabled();
+  await expect(page.getByLabel("View as")).toBeDisabled();
   const before = await page.evaluate(() => JSON.parse(localStorage.getItem("muson-demo-v1")!).state.data.registrations.find((item: { id: string }) => item.id === "ada-theory").attempt);
   await page.reload();
   await expect(page.locator(".question")).toBeVisible();
@@ -115,4 +135,39 @@ test("attempt survives reload and expires exactly once", async ({ page }) => {
   await expect(page.locator(".score-number")).toContainText("0 / 100");
   await page.reload();
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem("muson-demo-v1")!).state.data.registrations.find((item: { id: string }) => item.id === "ada-theory").scores.length)).toBe(1);
+});
+
+test("checkout cancellation and optional camera lifecycle", async ({ page }, info) => {
+  await page.goto("/candidate/register/");
+  await page.getByRole("button", { name: "Add exam entries" }).click();
+  await page.getByRole("button", { name: "Pay mock fee", exact: true }).click();
+  await page.getByRole("button", { name: "Simulate declined payment" }).click();
+  await expect(page.getByRole("dialog")).toContainText("Nothing has been charged");
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("muson-demo-v1")!).state.data.payments.length)).toBe(0);
+  await page.getByRole("button", { name: "Pay mock fee", exact: true }).click();
+  await page.getByRole("button", { name: "Complete test payment" }).click();
+  await page.goto("/candidate/theory/");
+  await page.evaluate(() => {
+    let calls = 0;
+    Object.defineProperty(navigator.mediaDevices, "getUserMedia", { value: async () => {
+      if (++calls === 1) throw new DOMException("Test denial", "NotAllowedError");
+      const canvas = document.createElement("canvas");
+      canvas.width = 320; canvas.height = 180;
+      canvas.getContext("2d")!.fillRect(0, 0, 320, 180);
+      const stream = canvas.captureStream(5);
+      (window as unknown as { demoTracks: MediaStreamTrack[] }).demoTracks = stream.getTracks();
+      return stream;
+    } });
+  });
+  await page.getByRole("button", { name: "Enable camera preview" }).click();
+  await expect(page.getByText(/Camera unavailable or permission declined/)).toBeVisible();
+  await page.getByRole("button", { name: "Enable camera preview" }).click();
+  await expect(page.getByRole("button", { name: "Turn camera off" })).toBeVisible();
+  await expect(page.getByLabel("Live camera preview")).toBeVisible();
+  await page.screenshot({ path: info.outputPath("readiness.png"), fullPage: true });
+  for (const checkbox of await page.getByRole("checkbox").all()) await checkbox.check();
+  await page.getByRole("button", { name: "Begin examination" }).click();
+  await expect(page.locator(".question")).toBeVisible();
+  expect(await page.evaluate(() => (window as unknown as { demoTracks: MediaStreamTrack[] }).demoTracks.every(track => track.readyState === "ended"))).toBe(true);
 });
